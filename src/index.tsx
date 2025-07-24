@@ -9,6 +9,7 @@ import { getFullnodeUrl } from "@mysten/sui/client";
 const queryClient = new QueryClient();
 const networks = {
   mainnet: { url: getFullnodeUrl("mainnet") },
+  testnet: { url: getFullnodeUrl("testnet") },
   devnet: { url: getFullnodeUrl("devnet") },
 };
 
@@ -19,7 +20,7 @@ const root = ReactDOM.createRoot(
 root.render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <SuiClientProvider networks={networks}>
+      <SuiClientProvider networks={networks} defaultNetwork="mainnet">
         <WalletProvider>
           <App />
         </WalletProvider>
