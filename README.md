@@ -2,9 +2,9 @@ This is the administrator page for arttoo.
 
 ## Done
 - [x] Update offering end time
+- [x] Withdraw proceeds
 
 ## To-Do
-- [ ] Withdraw proceeds
 - [ ] Activate trading phase
 - [ ] ...
 
@@ -47,7 +47,9 @@ This application provides the following features for administrators of the Artto
     *   Displays the connected wallet's address.
     *   Shows the SUI balance of the connected wallet.
     *   Fetches and displays the current end time for the offering from the smart contract.
+    *   Shows detailed presale progress including tokens sold, available tokens, total proceeds, and fees.
 *   **Update Offering End Time:** Allows an administrator to set a new end time for the offering. This is a privileged action that requires an admin proof from the smart contract.
+*   **Withdraw Proceeds:** Allows administrators to withdraw the collected proceeds from the offering. This feature requires both admin and super admin privileges and transfers the proceeds as USDC tokens to a specified address.
 
 ## Smart Contract Interaction
 

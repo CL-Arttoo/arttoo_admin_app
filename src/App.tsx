@@ -6,20 +6,20 @@ import { SuiClient } from '@mysten/sui/client';
 import { Transaction } from '@mysten/sui/transactions';
 
 // mainnet
-const rpc_url = "https://fullnode.mainnet.sui.io:443";
-const PACKAGE_ID = "0x9d11135054b1ab5f53653b88fb83979255417e6c6049ac91535b78c0d4803976";
-const OFFERING_OBJECT_ID = "0xe24160d0aa7ca299cf608144b0abe109b8ca5c0a612e38c9a1aec18a1130c451";
-const REGISTRY_OBJECT_ID = "0x26407ed0fa0324604960fb38d747a8c2e36dedefb55918949d5c27ec502c650e";
-const VAULT_OBJECT_ID = "0x8e6be131f12236f4340e96c97ac0e2466b8cfe32e7dbc486d888bbd1dc4a70b1";
-const COIN_TYPE = "0x1e55cc88c0cefbaab52a129dabb79097f563391f015bef682bac46247f3fa2e4::loj::LOJ";
+// const rpc_url = "https://fullnode.mainnet.sui.io:443";
+// const PACKAGE_ID = "0x9d11135054b1ab5f53653b88fb83979255417e6c6049ac91535b78c0d4803976";
+// const OFFERING_OBJECT_ID = "0xe24160d0aa7ca299cf608144b0abe109b8ca5c0a612e38c9a1aec18a1130c451";
+// const REGISTRY_OBJECT_ID = "0x26407ed0fa0324604960fb38d747a8c2e36dedefb55918949d5c27ec502c650e";
+// const VAULT_OBJECT_ID = "0x8e6be131f12236f4340e96c97ac0e2466b8cfe32e7dbc486d888bbd1dc4a70b1";
+// const COIN_TYPE = "0x1e55cc88c0cefbaab52a129dabb79097f563391f015bef682bac46247f3fa2e4::loj::LOJ";
 
 // testnet
-// const rpc_url = "https://fullnode.testnet.sui.io:443";
-// const PACKAGE_ID = "0xff0839064b38e03c1f873a667403e99e7e7fd2e905340d3f283b5e6ac06d293b";
-// const OFFERING_OBJECT_ID = "0xbdedd42c7d14f41d408e444d46cba3ba5c8578c56b72a6c8c03521bb27f9544f";
-// const REGISTRY_OBJECT_ID = "0x5e7d8a64811de9e676cb29e759757096daad6dfcf93bc5584cbe6f21a020c9be";
-// const VAULT_OBJECT_ID = "0x3e5e21d08644b85b686ca076c0bd9fc4f62721a12ddb5a519bfc7dc433af0e6b";
-// const COIN_TYPE = "0x63ffab44beea2cb7b1c0a97bd02a0103dfdc2e9e421ffb42dbde8a69ffcdda32::coin_template::COIN_TEMPLATE";
+const rpc_url = "https://fullnode.testnet.sui.io:443";
+const PACKAGE_ID = "0xff0839064b38e03c1f873a667403e99e7e7fd2e905340d3f283b5e6ac06d293b";
+const OFFERING_OBJECT_ID = "0xbdedd42c7d14f41d408e444d46cba3ba5c8578c56b72a6c8c03521bb27f9544f";
+const REGISTRY_OBJECT_ID = "0x5e7d8a64811de9e676cb29e759757096daad6dfcf93bc5584cbe6f21a020c9be";
+const VAULT_OBJECT_ID = "0x3e5e21d08644b85b686ca076c0bd9fc4f62721a12ddb5a519bfc7dc433af0e6b";
+const COIN_TYPE = "0x63ffab44beea2cb7b1c0a97bd02a0103dfdc2e9e421ffb42dbde8a69ffcdda32::coin_template::COIN_TEMPLATE";
 
 // It's generally better to use a client from a provider, but for this simple query a new client is fine.
 const suiClient = new SuiClient({ url: rpc_url });
@@ -34,13 +34,17 @@ function App() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
 
+  // Proceeds withdrawal state
+  const [receivingAddress, setReceivingAddress] = useState('');
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
+
   // Presale information state
   const [presaleData, setPresaleData] = useState<{
     tokenAllocation: number;
     tokensSold: number;
     availableTokens: number;
     totalProceeds: number;
-    totalFees: number;
   } | null>(null);
 
   const fetchOfferingEndTime = useCallback(() => {
@@ -101,19 +105,13 @@ function App() {
       target: `${PACKAGE_ID}::offering::total_proceeds`,
       arguments: [tx.object(OFFERING_OBJECT_ID)],
     });
-    
-    // Fetch total fees
-    tx.moveCall({
-      target: `${PACKAGE_ID}::offering::total_fees`,
-      arguments: [tx.object(OFFERING_OBJECT_ID)],
-    });
 
     suiClient.devInspectTransactionBlock({
       sender: account!.address,
       transactionBlock: tx,
     }).then(res => {
       console.log("Presale data fetch result:", res);
-      if (res.results && res.results.length >= 5) {
+      if (res.results && res.results.length >= 4) {
         try {
           // Parse token allocation (command 0)
           const tokenAllocationRaw = res.results[0]?.returnValues?.[0]?.[0];
@@ -139,18 +137,11 @@ function App() {
           const totalProceedsView = new DataView(new Uint8Array(totalProceedsRaw).buffer);
           const totalProceeds = Number(totalProceedsView.getBigUint64(0, true)) / 1_000_000; // Convert from 6 decimals (USDC)
           
-          // Parse total fees (command 4)
-          const totalFeesRaw = res.results[4]?.returnValues?.[0]?.[0];
-          if (!totalFeesRaw) throw new Error("Missing total fees data");
-          const totalFeesView = new DataView(new Uint8Array(totalFeesRaw).buffer);
-          const totalFees = Number(totalFeesView.getBigUint64(0, true)) / 1_000_000; // Convert from 6 decimals (USDC)
-          
           setPresaleData({
             tokenAllocation,
             tokensSold,
             availableTokens,
-            totalProceeds,
-            totalFees
+            totalProceeds
           });
         } catch (error) {
           console.error("Error parsing presale data:", error);
@@ -239,6 +230,84 @@ function App() {
           console.error("Update failed:", error);
           setUpdateError("Failed to update end time. See console for details.");
           setIsUpdating(false);
+        },
+      }
+    );
+  };
+
+  const handleWithdrawProceeds = () => {
+    if (!receivingAddress) {
+      setWithdrawError("Please enter a receiving address.");
+      return;
+    }
+    if (!account) {
+      setWithdrawError("Cannot withdraw: wallet not connected.");
+      return;
+    }
+    if (!presaleData || presaleData.totalProceeds <= 0) {
+      setWithdrawError("No proceeds available to withdraw.");
+      return;
+    }
+
+    setWithdrawError(null);
+    setIsWithdrawing(true);
+
+    const tx = new Transaction();
+    
+    // Get both admin and super admin proofs
+    const adminProof = tx.moveCall({
+      target: `${PACKAGE_ID}::arttoo::admin_proof`,
+      arguments: [tx.object(REGISTRY_OBJECT_ID)],
+    });
+
+    const superAdminProof = tx.moveCall({
+      target: `${PACKAGE_ID}::arttoo::super_admin_proof`,
+      arguments: [tx.object(REGISTRY_OBJECT_ID)],
+    });
+
+    // Receive the offering from the artwork vault
+    const receivedOffering = tx.moveCall({
+      target: `${PACKAGE_ID}::artwork::receive_offering`,
+      arguments: [
+        tx.object(VAULT_OBJECT_ID),
+        adminProof,
+        tx.object(OFFERING_OBJECT_ID),
+      ],
+      typeArguments: [COIN_TYPE],
+    });
+
+    // Withdraw the proceeds from the offering
+    const proceeds = tx.moveCall({
+      target: `${PACKAGE_ID}::offering::withdraw_proceeds`,
+      arguments: [
+        receivedOffering,
+        superAdminProof,
+      ],
+    });
+
+    // Transfer the proceeds to the receiving address
+    tx.transferObjects([proceeds], tx.pure.address(receivingAddress));
+
+    // Return the offering to the artwork vault
+    tx.transferObjects([receivedOffering], tx.pure.address(VAULT_OBJECT_ID));
+
+    tx.setGasBudget(500_000_000);
+
+    signAndExecute(
+      {
+        transaction: tx,
+      },
+      {
+        onSuccess: (result) => {
+          console.log("Withdrawal successful:", result);
+          setIsWithdrawing(false);
+          setReceivingAddress(''); // Clear the input
+          fetchPresaleData(); // Refresh presale data
+        },
+        onError: (error) => {
+          console.error("Withdrawal failed:", error);
+          setWithdrawError("Failed to withdraw proceeds. See console for details.");
+          setIsWithdrawing(false);
         },
       }
     );
@@ -420,38 +489,10 @@ function App() {
                       border: "1px solid #c3e6c3"
                     }}>
                       <div style={{color: "#155724", fontSize: "0.8rem", fontWeight: "500", marginBottom: "0.25rem"}}>
-                        TOTAL PROCEEDS
+                        PROCEEDS in VAULT
                       </div>
                       <div style={{color: "#155724", fontSize: "1.25rem", fontWeight: "700"}}>
                         ${presaleData.totalProceeds.toLocaleString()} USDC
-                      </div>
-                    </div>
-                    
-                    <div style={{
-                      padding: "1rem",
-                      backgroundColor: "#fff3cd",
-                      borderRadius: "8px",
-                      border: "1px solid #ffeaa7"
-                    }}>
-                      <div style={{color: "#856404", fontSize: "0.8rem", fontWeight: "500", marginBottom: "0.25rem"}}>
-                        TOTAL FEES
-                      </div>
-                      <div style={{color: "#856404", fontSize: "1.25rem", fontWeight: "700"}}>
-                        ${presaleData.totalFees.toLocaleString()} USDC
-                      </div>
-                    </div>
-                    
-                    <div style={{
-                      padding: "1rem",
-                      backgroundColor: "#cce5ff",
-                      borderRadius: "8px",
-                      border: "1px solid #99d6ff"
-                    }}>
-                      <div style={{color: "#003d82", fontSize: "0.8rem", fontWeight: "500", marginBottom: "0.25rem"}}>
-                        NET PROCEEDS
-                      </div>
-                      <div style={{color: "#003d82", fontSize: "1.25rem", fontWeight: "700"}}>
-                        ${(presaleData.totalProceeds - presaleData.totalFees).toLocaleString()} USDC
                       </div>
                     </div>
                   </div>
@@ -561,6 +602,178 @@ function App() {
                   fontSize: "0.9rem"
                 }}>
                   ❌ {updateError}
+                </div>
+              )}
+            </div>
+
+            {/* Proceeds Management Card - Full Width */}
+            <div style={{
+              backgroundColor: "white",
+              borderRadius: "12px",
+              padding: "1.5rem",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+              border: "1px solid #e0e0e0",
+              gridColumn: "1 / -1"
+            }}>
+              <h2 style={{
+                margin: "0 0 1.5rem 0",
+                color: "#1a1a1a",
+                fontSize: "1.25rem",
+                fontWeight: "600"
+              }}>
+                💰 Proceeds Management
+              </h2>
+              
+              {presaleData ? (
+                <>
+                  {/* Current Proceeds Display */}
+                  <div style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                    gap: "1rem",
+                    marginBottom: "2rem"
+                  }}>
+                    <div style={{
+                      padding: "1rem",
+                      backgroundColor: "#e8f5e8",
+                      borderRadius: "8px",
+                      border: "1px solid #c3e6c3",
+                      textAlign: "center"
+                    }}>
+                      <div style={{color: "#155724", fontSize: "0.8rem", fontWeight: "500", marginBottom: "0.25rem"}}>
+                        TOTAL PROCEEDS
+                      </div>
+                      <div style={{color: "#155724", fontSize: "1.5rem", fontWeight: "700"}}>
+                        ${presaleData.tokensSold.toLocaleString()} USDC
+                      </div>
+                    </div>
+                    
+                    <div style={{
+                      padding: "1rem",
+                      backgroundColor: "#cce5ff",
+                      borderRadius: "8px",
+                      border: "1px solid #99d6ff",
+                      textAlign: "center"
+                    }}>
+                      <div style={{color: "#003d82", fontSize: "0.8rem", fontWeight: "500", marginBottom: "0.25rem"}}>
+                        WITHDRAWABLE AMOUNT
+                      </div>
+                      <div style={{color: "#003d82", fontSize: "1.5rem", fontWeight: "700"}}>
+                        ${presaleData.totalProceeds.toLocaleString()} USDC
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Withdrawal Form */}
+                  <div style={{
+                    display: "flex",
+                    gap: "1rem",
+                    alignItems: "flex-end",
+                    flexWrap: "wrap",
+                    width: "100%"
+                  }}>
+                    <div style={{flex: "1", minWidth: "300px", maxWidth: "600px"}}>
+                      <label style={{
+                        display: "block",
+                        marginBottom: "0.5rem",
+                        color: "#495057",
+                        fontWeight: "500",
+                        fontSize: "0.9rem"
+                      }}>
+                        Receiving Address
+                      </label>
+                      <input 
+                        type="text" 
+                        value={receivingAddress}
+                        onChange={(e) => setReceivingAddress(e.target.value)}
+                        placeholder="Enter the address to receive proceeds..."
+                        style={{
+                          width: "100%",
+                          maxWidth: "100%",
+                          padding: "0.75rem",
+                          border: "2px solid #e9ecef",
+                          borderRadius: "8px",
+                          fontSize: "0.9rem",
+                          outline: "none",
+                          transition: "border-color 0.15s ease-in-out",
+                          boxSizing: "border-box",
+                          fontFamily: "monospace"
+                        }}
+                        onFocus={(e) => e.target.style.borderColor = "#28a745"}
+                        onBlur={(e) => e.target.style.borderColor = "#e9ecef"}
+                      />
+                    </div>
+                    
+                    <button 
+                      onClick={handleWithdrawProceeds} 
+                      disabled={isWithdrawing || !presaleData || presaleData.totalProceeds <= 0}
+                      style={{
+                        padding: "0.75rem 1.5rem",
+                        backgroundColor: isWithdrawing || !presaleData || presaleData.totalProceeds <= 0 
+                          ? "#6c757d" 
+                          : "#28a745",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "8px",
+                        fontSize: "0.9rem",
+                        fontWeight: "500",
+                        cursor: isWithdrawing || !presaleData || presaleData.totalProceeds <= 0 
+                          ? "not-allowed" 
+                          : "pointer",
+                        transition: "background-color 0.15s ease-in-out",
+                        whiteSpace: "nowrap",
+                        minWidth: "160px"
+                      }}
+                      onMouseOver={(e) => {
+                        if (!isWithdrawing && presaleData && presaleData.totalProceeds > 0) {
+                          (e.target as HTMLButtonElement).style.backgroundColor = "#218838";
+                        }
+                      }}
+                      onMouseOut={(e) => {
+                        if (!isWithdrawing && presaleData && presaleData.totalProceeds > 0) {
+                          (e.target as HTMLButtonElement).style.backgroundColor = "#28a745";
+                        }
+                      }}
+                    >
+                      {isWithdrawing ? "Withdrawing..." : "Withdraw Proceeds"}
+                    </button>
+                  </div>
+                  
+                  {withdrawError && (
+                    <div style={{
+                      marginTop: "1rem",
+                      padding: "0.75rem",
+                      backgroundColor: "#f8d7da",
+                      border: "1px solid #f5c6cb",
+                      borderRadius: "6px",
+                      color: "#721c24",
+                      fontSize: "0.9rem"
+                    }}>
+                      ❌ {withdrawError}
+                    </div>
+                  )}
+
+                  <div style={{
+                    marginTop: "1rem",
+                    padding: "0.75rem",
+                    backgroundColor: "#d4edda",
+                    border: "1px solid #c3e6cb",
+                    borderRadius: "6px",
+                    color: "#155724",
+                    fontSize: "0.85rem"
+                  }}>
+                    ℹ️ <strong>Note:</strong> This action requires both admin and super admin privileges. 
+                    The proceeds will be transferred to the specified address as USDC tokens.
+                  </div>
+                </>
+              ) : (
+                <div style={{
+                  textAlign: "center",
+                  padding: "2rem",
+                  color: "#6c757d"
+                }}>
+                  <div style={{fontSize: "1.5rem", marginBottom: "0.5rem"}}>⏳</div>
+                  <p>Loading proceeds data...</p>
                 </div>
               )}
             </div>
