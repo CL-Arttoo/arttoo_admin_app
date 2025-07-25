@@ -3,9 +3,9 @@ This is the administrator page for arttoo.
 ## Done
 - [x] Update offering end time
 - [x] Withdraw proceeds
+- [x] Activate trading phase
 
 ## To-Do
-- [ ] Activate trading phase
 - [ ] ...
 
 It is used to for admin to update end time(done), withdraw proceeds(to-do), activate trading phase(tio-do) and etc.
@@ -50,6 +50,7 @@ This application provides the following features for administrators of the Artto
     *   Shows detailed presale progress including tokens sold, available tokens, total proceeds, and fees.
 *   **Update Offering End Time:** Allows an administrator to set a new end time for the offering. This is a privileged action that requires an admin proof from the smart contract.
 *   **Withdraw Proceeds:** Allows administrators to withdraw the collected proceeds from the offering. This feature requires both admin and super admin privileges and transfers the proceeds as USDC tokens to a specified address.
+*   **Activate Trading Phase:** Enables administrators to transition from presale to trading phase when criteria are met (presale time has ended OR all tokens are sold). This feature requires admin privileges and displays real-time status of activation criteria.
 
 ## Smart Contract Interaction
 
