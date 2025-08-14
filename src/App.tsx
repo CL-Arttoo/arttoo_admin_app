@@ -55,6 +55,8 @@ function App() {
   // Trading activation state
   const [isActivatingTrading, setIsActivatingTrading] = useState(false);
   const [activationError, setActivationError] = useState<string | null>(null);
+  const [isEndingOffering, setIsEndingOffering] = useState(false);
+  const [endError, setEndError] = useState<string | null>(null);
 
   // Offering status state
   const [offeringStatus, setOfferingStatus] = useState<number | null>(null);
@@ -522,14 +524,6 @@ function App() {
       target: `${PACKAGE_ID}::arttoo::admin_proof`,
       arguments: [tx.object(REGISTRY_OBJECT_ID)],
     });
-    // receive the offering
-    const receivedOffering = tx.moveCall({
-      target: `${PACKAGE_ID}::artwork::receive_offering`,
-      arguments: [tx.object(VAULT_OBJECT_ID), adminProof, tx.object(OFFERING_OBJECT_ID)],
-      typeArguments: [COIN_TYPE],
-    });
-
-
     // Activate the trading round
     tx.moveCall({
       target: `${PACKAGE_ID}::artwork::activate_trading_round`,
@@ -541,18 +535,6 @@ function App() {
       ],
       typeArguments: [COIN_TYPE],
     });
-
-    // end the offering(stop users from buying wat, and make the statement aligned)
-    tx.moveCall({
-      target: `${PACKAGE_ID}::offering::end`,
-      arguments: [
-          receivedOffering,
-          adminProof,
-          tx.object(SUI_CLOCK_OBJECT_ID),
-      ],
-  });
-
-    tx.transferObjects([receivedOffering], tx.pure.address(VAULT_OBJECT_ID));
 
     tx.setGasBudget(500_000_000);
 
@@ -573,6 +555,76 @@ function App() {
           console.error("Trading activation failed:", error);
           setActivationError("Failed to activate trading. See console for details.");
           setIsActivatingTrading(false);
+        },
+      }
+    );
+  };
+
+  const handleEndOffering = () => {
+    if (!account) {
+      setEndError("Cannot end offering: wallet not connected.");
+      return;
+    }
+
+    if (offeringStatus !== OFFERING_STATE_ACTIVE) {
+      setEndError("Offering must be active to end.");
+      return;
+    }
+
+    const currentTime = Date.now();
+    const isTimeElapsed = currentTime > offeringEndTimeMs;
+    const isFullySold = presaleData && presaleData.availableTokens === 0;
+    if (!isTimeElapsed && !isFullySold) {
+      setEndError("Cannot end yet. Presale must end or all tokens must be sold.");
+      return;
+    }
+
+    setEndError(null);
+    setIsEndingOffering(true);
+
+    const tx = new Transaction();
+
+    const adminProof = tx.moveCall({
+      target: `${PACKAGE_ID}::arttoo::admin_proof`,
+      arguments: [tx.object(REGISTRY_OBJECT_ID)],
+    });
+
+    const receivedOffering = tx.moveCall({
+      target: `${PACKAGE_ID}::artwork::receive_offering`,
+      arguments: [tx.object(VAULT_OBJECT_ID), adminProof, tx.object(OFFERING_OBJECT_ID)],
+      typeArguments: [COIN_TYPE],
+    });
+
+    tx.moveCall({
+      target: `${PACKAGE_ID}::offering::end`,
+      arguments: [
+        receivedOffering,
+        adminProof,
+        tx.object(SUI_CLOCK_OBJECT_ID),
+      ],
+    });
+
+    tx.transferObjects([receivedOffering], tx.pure.address(VAULT_OBJECT_ID));
+
+    tx.setGasBudget(500_000_000);
+
+    signAndExecute(
+      {
+        transaction: tx,
+      },
+      {
+        onSuccess: (result) => {
+          console.log("End offering successful:", result);
+          setIsEndingOffering(false);
+          fetchOfferingEndTime();
+          fetchPresaleData();
+          fetchOfferingStatus();
+          fetchArtworkVaultInfo();
+        },
+        onError: (error) => {
+          console.error("End offering failed:", error);
+          setEndError("Failed to end offering. See console for details.");
+          setIsEndingOffering(false);
         },
       }
     );
@@ -1128,7 +1180,7 @@ function App() {
                 fontSize: "1.25rem",
                 fontWeight: "600"
               }}>
-                🚀 Activate Trading Phase(change offering status and vault round)
+                🚀 End Presale & Activate Trading
               </h2>
               
               {presaleData ? (
@@ -1279,10 +1331,41 @@ function App() {
                     </div>
                   </div>
 
-                  {/* Activation Button */}
-                  <div style={{
-                    textAlign: "center"
-                  }}>
+                  {/* Action Buttons */}
+                  <div style={{ display: "flex", gap: "1rem", justifyContent: "center", flexWrap: "wrap" }}>
+                    <button
+                      onClick={handleEndOffering}
+                      disabled={isEndingOffering || offeringStatus !== OFFERING_STATE_ACTIVE || (Date.now() <= offeringEndTimeMs && presaleData.availableTokens > 0)}
+                      style={{
+                        padding: "0.75rem 2rem",
+                        backgroundColor: isEndingOffering || offeringStatus !== OFFERING_STATE_ACTIVE || (Date.now() <= offeringEndTimeMs && presaleData.availableTokens > 0)
+                          ? "#6c757d"
+                          : "#dc3545",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "8px",
+                        fontSize: "1rem",
+                        fontWeight: "500",
+                        cursor: isEndingOffering || offeringStatus !== OFFERING_STATE_ACTIVE || (Date.now() <= offeringEndTimeMs && presaleData.availableTokens > 0)
+                          ? "not-allowed"
+                          : "pointer",
+                        transition: "background-color 0.15s ease-in-out",
+                        minWidth: "200px"
+                      }}
+                      onMouseOver={(e) => {
+                        if (!isEndingOffering && offeringStatus === OFFERING_STATE_ACTIVE && (Date.now() > offeringEndTimeMs || presaleData.availableTokens === 0)) {
+                          (e.target as HTMLButtonElement).style.backgroundColor = "#c82333";
+                        }
+                      }}
+                      onMouseOut={(e) => {
+                        if (!isEndingOffering && offeringStatus === OFFERING_STATE_ACTIVE && (Date.now() > offeringEndTimeMs || presaleData.availableTokens === 0)) {
+                          (e.target as HTMLButtonElement).style.backgroundColor = "#dc3545";
+                        }
+                      }}
+                    >
+                      {isEndingOffering ? "Ending..." : "End Offering"}
+                    </button>
+
                     <button 
                       onClick={handleActivateTrading} 
                       disabled={isActivatingTrading || offeringStatus !== OFFERING_STATE_ACTIVE || (Date.now() <= offeringEndTimeMs && presaleData.availableTokens > 0)}
@@ -1313,11 +1396,11 @@ function App() {
                         }
                       }}
                     >
-                      {isActivatingTrading ? "Activating..." : "Activate Trading Phase"}
+                      {isActivatingTrading ? "Activating..." : "Activate Trading"}
                     </button>
                   </div>
                   
-                  {activationError && (
+                  {(activationError || endError) && (
                     <div style={{
                       marginTop: "1rem",
                       padding: "0.75rem",
@@ -1328,7 +1411,7 @@ function App() {
                       fontSize: "0.9rem",
                       textAlign: "center"
                     }}>
-                      ❌ {activationError}
+                      ❌ {endError ?? activationError}
                     </div>
                   )}
 
